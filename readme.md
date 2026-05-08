@@ -10,27 +10,25 @@ This guide explains how to deploy **Entebus Server** on Kubernetes using Kustomi
 - Deploys application: `entebus-server`
 - Creates service: `entebus-server-svc` (ClusterIP `80 -> 8080`)
 - Creates ingress: `entebus-ingress`
-- Provides default ConfigMap + Secret values (must be overridden for production)
+- Provides ConfigMap + Secret defaults, plus the shared PostGIS, Redis, MinIO, and OpenObserve workloads
+- Includes the app HPA and PodDisruptionBudget
 
 ### `overlays/dev`
 
 - Includes `base`
-- Deploys local dependencies inside cluster:
-	- PostGIS (`postgis`)
-	- Redis (`redis`)
-	- MinIO (`minio`)
-	- OpenObserve (`openobserve`)
 - Uses app image tag: `develop`
-- Rewrites ingress host to: `dev-api.entebus.com`
 - Changes namespace label `environment` to `dev`
-- Rewrites ingress host to: `dev-api.entebus.com` and adds hosts for developer UIs:
-   - `dev-minio.entebus.com` (MinIO console)
-   - `dev-openobserve.entebus.com` (OpenObserve UI)
+- Rewrites ingress hosts to:
+	- `dev-api.entebus.com`
+	- `dev-minio.entebus.com` (MinIO console)
+	- `dev-openobserve.entebus.com` (OpenObserve UI)
+- Keeps the app HPA conservative for local development
 
 ### `overlays/prod`
 
-- Includes only `base`
-- Intended for production where DB/object storage/observability are provided externally or separately
+- Includes `base`
+- Keeps the shared stack in-cluster with PVC-backed persistence
+- Raises the app replica floor and HPA minimum for production availability
 
 ## ✅ Prerequisites
 
@@ -56,8 +54,8 @@ helm version
 Run these before applying to ensure all manifests compile correctly.
 
 ```bash
-kubectl kustomize k8s/overlays/prod
-kubectl kustomize k8s/overlays/dev
+kubectl kustomize overlays/prod
+kubectl kustomize overlays/dev
 ```
 
 If either command fails, fix the corresponding YAML/patch before deployment.
@@ -67,7 +65,7 @@ If either command fails, fix the corresponding YAML/patch before deployment.
 Apply the dev overlay:
 
 ```bash
-kubectl apply -k k8s/overlays/dev
+kubectl apply -k overlays/dev
 ```
 
 Watch resources:
@@ -184,10 +182,10 @@ Use this sequence for safer rollout:
 ## ⚠️ Production Notes
 
 - Do not keep default credentials from `base/config.yaml` for production
-- Replace image tag from `latest` with immutable release tags
-- For production, keep dependent services highly available and outside the single-node dev pattern
-- Consider using external secret manager / sealed secrets / CSI driver
-- Add persistence strategy beyond `hostPath` (e.g., PVC + StorageClass)
+- Replace `latest` image tags in `overlays/prod/kustomization.yaml` with immutable release tags before deployment
+- The shared stack now runs in-cluster with PVC-backed persistence, so ensure your StorageClass and volumes are production-grade
+- HPA requires metrics-server to be installed and healthy
+- Consider external secret management, sealed secrets, or a CSI secret driver for long-term operations
 
 ## 🛠️ Useful Troubleshooting Commands
 
