@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Pin all image versions for production
+# Replace 'latest' tags with specific immutable versions before deploying
+images:
+  - name: ghcr.io/nixbug/entebus-server
+    newTag: latest  # Replace with a specific release tag, e.g. "1.2.3"
+  - name: postgis/postgis
+    newTag: "17-3.5"
+  - name: redis
+    newTag: "7.2-alpine"
+  - name: minio/minio
+    newTag: latest  # Replace with a specific RELEASE.* tag
+  - name: public.ecr.aws/zinclabs/openobserve
+    newTag: latest  # Replace with a specific version tag, e.g. "v0.13.3"
+
+patches:
+  - target:
+      kind: Deployment
+      name: entebus-server
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: entebus-server
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
