@@ -30,7 +30,7 @@ spec:
         fsGroup: 999
       containers:
         - name: postgis
-          image: postgis/postgis
+          image: postgis/postgis:18-3.6-alpine
           env:
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
