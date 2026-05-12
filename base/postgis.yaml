@@ -33,7 +33,7 @@ spec:
           image: postgis/postgis:18-3.6-alpine
           env:
             - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
+              value: /var/lib/postgresql/data
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
