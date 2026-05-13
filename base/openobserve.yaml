@@ -32,7 +32,7 @@ spec:
         runAsGroup: 2000
       containers:
         - name: openobserve
-          image: openobserve/openobserve:v0.80.3
+          image: public.ecr.aws/zinclabs/openobserve
           ports:
             - name: http
               containerPort: 5080
