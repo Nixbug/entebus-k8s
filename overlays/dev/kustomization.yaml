@@ -95,11 +95,3 @@ patches:
       - op: replace
         path: /spec/resources/requests/storage
         value: 1Gi
-
-  - target:
-      kind: PersistentVolumeClaim
-      name: redis-pvc
-    patch: |-
-      - op: replace
-        path: /spec/resources/requests/storage
-        value: 1Gi
