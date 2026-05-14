@@ -49,10 +49,6 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
           readinessProbe:
             tcpSocket:
               port: redis

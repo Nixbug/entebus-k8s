@@ -70,3 +70,36 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/imagePullPolicy
         value: Always
+
+  # Override PVC sizes for dev cluster
+  - target:
+      kind: PersistentVolumeClaim
+      name: postgis-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi
+
+  - target:
+      kind: PersistentVolumeClaim
+      name: minio-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi
+
+  - target:
+      kind: PersistentVolumeClaim
+      name: openobserve-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi
+
+  - target:
+      kind: PersistentVolumeClaim
+      name: redis-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi
