@@ -37,3 +37,64 @@ patches:
       - op: replace
         path: /spec/maxReplicas
         value: 10
+  - target:
+      kind: Deployment
+      name: postgis
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+  - target:
+      kind: Deployment
+      name: openobserve
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+  - target:
+      kind: Deployment
+      name: minio
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+  - target:
+      kind: Deployment
+      name: redis
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+  - target:
+      kind: PersistentVolumeClaim
+      name: postgis-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 10Gi
+  - target:
+      kind: PersistentVolumeClaim
+      name: minio-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 20Gi
+  - target:
+      kind: PersistentVolumeClaim
+      name: openobserve-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 20Gi
