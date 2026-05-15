@@ -26,7 +26,6 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 3
-
   - target:
       kind: HorizontalPodAutoscaler
       name: entebus-server

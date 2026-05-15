@@ -26,7 +26,6 @@ patches:
       - op: replace
         path: /metadata/labels/environment
         value: dev
-
   # Rewrite all ingress hostnames to dev-* subdomains
   - target:
       kind: Ingress
@@ -50,7 +49,6 @@ patches:
       - op: replace
         path: /spec/rules/2/host
         value: dev-openobserve.entebus.com
-
   # Always pull the latest develop image in dev
   - target:
       kind: HorizontalPodAutoscaler
@@ -62,7 +60,6 @@ patches:
       - op: replace
         path: /spec/maxReplicas
         value: 2
-
   - target:
       kind: Deployment
       name: entebus-server
@@ -70,7 +67,6 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/imagePullPolicy
         value: Always
-
   # Override PVC sizes for dev cluster
   - target:
       kind: PersistentVolumeClaim
@@ -79,7 +75,6 @@ patches:
       - op: replace
         path: /spec/resources/requests/storage
         value: 1Gi
-
   - target:
       kind: PersistentVolumeClaim
       name: minio-pvc
@@ -87,7 +82,6 @@ patches:
       - op: replace
         path: /spec/resources/requests/storage
         value: 1Gi
-
   - target:
       kind: PersistentVolumeClaim
       name: openobserve-pvc
