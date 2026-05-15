@@ -90,11 +90,11 @@ patches:
     patch: |-
       - op: replace
         path: /spec/resources/requests/storage
-        value: 20Gi
+        value: 10Gi
   - target:
       kind: PersistentVolumeClaim
       name: openobserve-pvc
     patch: |-
       - op: replace
         path: /spec/resources/requests/storage
-        value: 20Gi
+        value: 10Gi
