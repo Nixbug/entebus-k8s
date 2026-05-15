@@ -110,13 +110,6 @@ spec:
                 secretKeyRef:
                   name: entebus-server-secret
                   key: OPENOBSERVE_PASSWORD
-          resources:
-            requests:
-              cpu: 250m
-              memory: 256Mi
-            limits:
-              cpu: 1000m
-              memory: 512Mi
           readinessProbe:
             tcpSocket:
               port: http
@@ -127,3 +120,10 @@ spec:
               port: http
             initialDelaySeconds: 30
             periodSeconds: 15
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "512Mi"

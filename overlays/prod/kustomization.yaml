@@ -8,15 +8,15 @@ resources:
 # Replace 'latest' tags with specific immutable versions before deploying
 images:
   - name: ghcr.io/nixbug/entebus-server
-    newTag: latest  # Replace with a specific release tag, e.g. "1.2.3"
+    newTag: latest
   - name: postgis/postgis
-    newTag: "17-3.5"
+    newTag: "18-3.6-alpine"
   - name: redis
-    newTag: "7.2-alpine"
+    newTag: "8.6.3-alpine"
   - name: minio/minio
-    newTag: latest  # Replace with a specific RELEASE.* tag
+    newTag: RELEASE.2025-09-07T16-13-09Z
   - name: public.ecr.aws/zinclabs/openobserve
-    newTag: latest  # Replace with a specific version tag, e.g. "v0.13.3"
+    newTag: v0.80.3
 
 patches:
   - target:
@@ -26,7 +26,6 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 3
-
   - target:
       kind: HorizontalPodAutoscaler
       name: entebus-server
@@ -37,3 +36,64 @@ patches:
       - op: replace
         path: /spec/maxReplicas
         value: 10
+  - target:
+      kind: Deployment
+      name: postgis
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+  - target:
+      kind: Deployment
+      name: openobserve
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+  - target:
+      kind: Deployment
+      name: minio
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+  - target:
+      kind: Deployment
+      name: redis
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+  - target:
+      kind: PersistentVolumeClaim
+      name: postgis-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 10Gi
+  - target:
+      kind: PersistentVolumeClaim
+      name: minio-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 10Gi
+  - target:
+      kind: PersistentVolumeClaim
+      name: openobserve-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 10Gi

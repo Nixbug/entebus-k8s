@@ -9,13 +9,13 @@ images:
   - name: ghcr.io/nixbug/entebus-server
     newTag: develop
   - name: postgis/postgis
-    newTag: "17-3.5"
+    newTag: "18-3.6-alpine"
   - name: redis
-    newTag: "7.2-alpine"
+    newTag: "8.6.3-alpine"
   - name: minio/minio
-    newTag: latest
+    newTag: RELEASE.2025-09-07T16-13-09Z
   - name: public.ecr.aws/zinclabs/openobserve
-    newTag: latest
+    newTag: v0.80.3
 
 patches:
   # Label the namespace as dev
@@ -26,7 +26,6 @@ patches:
       - op: replace
         path: /metadata/labels/environment
         value: dev
-
   # Rewrite all ingress hostnames to dev-* subdomains
   - target:
       kind: Ingress
@@ -50,7 +49,6 @@ patches:
       - op: replace
         path: /spec/rules/2/host
         value: dev-openobserve.entebus.com
-
   # Always pull the latest develop image in dev
   - target:
       kind: HorizontalPodAutoscaler
@@ -62,7 +60,6 @@ patches:
       - op: replace
         path: /spec/maxReplicas
         value: 2
-
   - target:
       kind: Deployment
       name: entebus-server
@@ -70,3 +67,25 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/imagePullPolicy
         value: Always
+  # Override PVC sizes for dev cluster
+  - target:
+      kind: PersistentVolumeClaim
+      name: postgis-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi
+  - target:
+      kind: PersistentVolumeClaim
+      name: minio-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi
+  - target:
+      kind: PersistentVolumeClaim
+      name: openobserve-pvc
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi
