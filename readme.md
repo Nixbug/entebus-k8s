@@ -1,204 +1,222 @@
-# ☸️ Entebus Server Kubernetes Deployment Guide
+# Entebus Server Kubernetes Deployment Guide
 
-This guide explains how to deploy **Entebus Server** on Kubernetes using Kustomize overlays for **dev** and **prod**, install NGINX Ingress, and configure a Cloudflare Origin Certificate for encrypted HTTPS traffic to your cluster.
+This guide explains how to deploy Entebus Server with Kustomize overlays for three scenarios:
 
-## 🧩 What Each Overlay Does
+- overlays/dev: standard dev deployment through ingress-nginx
+- overlays/dev-cloudflared: dev deployment fronted by Cloudflare Tunnel (no public load balancer required)
+- overlays/prod: production deployment through ingress-nginx
 
-### `base`
+## Overlay Summary
 
-- Creates namespace: `entebus`
-- Deploys application: `entebus-server`
-- Creates service: `entebus-server-svc` (ClusterIP `80 -> 8080`)
-- Creates ingress: `entebus-ingress`
-- Provides ConfigMap + Secret defaults, plus the shared PostGIS, Redis, MinIO, and OpenObserve workloads
-- Includes the app HPA and PodDisruptionBudget
+### base
 
-### `overlays/dev`
+Base resources include:
 
-- Includes `base`
-- Uses app image tag: `develop`
-- Changes namespace label `environment` to `dev`
-- Rewrites ingress hosts to:
-	- `dev-api.entebus.com`
-	- `dev-minio.entebus.com` (MinIO console)
-	- `dev-openobserve.entebus.com` (OpenObserve UI)
-- Keeps the app HPA conservative for local development
+- Namespace: entebus
+- App deployment: entebus-server
+- Service: entebus-server-svc (ClusterIP 80 -> 8080)
+- Ingress: entebus-ingress
+- Shared dependencies: PostGIS, Redis, MinIO, OpenObserve
+- HPA and PodDisruptionBudget
 
-### `overlays/prod`
+### overlays/dev
 
-- Includes `base`
-- Keeps the shared stack in-cluster with PVC-backed persistence
-- Raises the app replica floor and HPA minimum for production availability
+Development overlay without Cloudflared components:
 
-## ✅ Prerequisites
+- Includes base
+- Uses app image tag develop-latest
+- Sets namespace label environment=dev
+- Uses dev hostnames on ingress:
+  - dev-api.entebus.com
+  - dev-minio.entebus.com
+  - dev-openobserve.entebus.com
+- Keeps conservative HPA and small PVC sizes for dev
 
-- A working Kubernetes cluster (MicroK8s/K8s)
-- `kubectl` configured to target the cluster
-- `helm` installed
-- DNS configured in Cloudflare for your API domain
-- TLS files from Cloudflare Origin CA (`origin.crt`, `origin.key`)
+### overlays/dev-cloudflared
 
-Optional checks:
+Development overlay with Cloudflare Tunnel side deployment:
+
+- Inherits from overlays/dev (all dev behavior is reused)
+- Adds cloudflared deployment and service account
+- Adds cloudflared-credentials secret manifest placeholder
+- Uses outbound tunnel from cluster to Cloudflare (no public LB for app ingress path)
+
+### overlays/prod
+
+Production overlay:
+
+- Includes base
+- Uses production-focused replica and resource settings
+- Uses larger PVC sizes
+
+### Image Tag Guidance
+
+- Use `develop-latest` in dev overlays when you want rapid iteration and the newest build automatically.
+- Use immutable tags (for example `v1.2.3` or a commit SHA) for reproducible testing and production rollouts.
+- Promote by pinning the exact tested image tag in `overlays/prod/kustomization.yaml` before release.
+
+## Prerequisites
+
+- Kubernetes cluster with kubectl access
+- kubectl and helm installed
+- ingress-nginx installed (for ingress resources)
+- Cloudflare account and zone access
+- For tunnel mode: an existing Cloudflare Tunnel and credentials JSON
+- For TLS termination with ingress: origin.crt and origin.key from Cloudflare Origin CA
+
+Optional sanity checks:
 
 ```bash
-# Export KUBECONFIG as needed
-export KUBECONFIG="$HOME/.kube/entebus-k8-dev-kubeconfig.yaml"
-
 kubectl version --client
 kubectl cluster-info
 helm version
 ```
 
-## 🔍 Render Kustomize Manifests (Validation)
+## Validate Manifests Before Deploying
 
-Run these before applying to ensure all manifests compile correctly.
-
-```bash
-kubectl kustomize overlays/prod
-kubectl kustomize overlays/dev
-```
-
-If either command fails, fix the corresponding YAML/patch before deployment.
-
-## 🚀 Deploy Dev Overlay
-
-Apply the dev overlay:
+Run this before any apply:
 
 ```bash
-kubectl apply -k overlays/dev
+kubectl kustomize overlays/dev > /tmp/entebus-dev.yaml
+kubectl kustomize overlays/dev-cloudflared > /tmp/entebus-dev-cloudflared.yaml
+kubectl kustomize overlays/prod > /tmp/entebus-prod.yaml
 ```
 
-Watch resources:
-
-```bash
-kubectl get all -n entebus
-kubectl get ingress -n entebus
-kubectl get configmap,secret -n entebus
-```
-
-## 🌐 Install Ingress NGINX Controller
-
-Install/upgrade ingress controller:
+## Install Or Verify Ingress NGINX
 
 ```bash
 helm upgrade --install ingress-nginx ingress-nginx \
-	--repo https://kubernetes.github.io/ingress-nginx \
-	--namespace ingress-nginx --create-namespace
-```
+  --repo https://kubernetes.github.io/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace
 
-Verify controller is healthy:
-
-```bash
 kubectl get pods -n ingress-nginx
 kubectl get svc -n ingress-nginx
 ```
 
-## 🔐 Cloudflare Origin Certificate Setup
+## Cloudflare Origin TLS Secret
 
-Use this when running Cloudflare in front of your cluster, so traffic from Cloudflare to ingress is encrypted.
-
-### 1 Generate certificate in Cloudflare
-
-In Cloudflare dashboard:
-
-1. Go to **SSL/TLS → Origin Server**
-2. Click **Create Certificate**
-3. Choose:
- 	 - **Private Key Type:** RSA (2048)
- 	 - **Hostnames:** add all required domains (example: `api.entebus.com`, `dev-api.entebus.com`, `dev-minio.entebus.com`, `dev-openobserve.entebus.com`, `minio.entebus.com`, `openobserve.entebus.com`)
-	 - **Validity:** 15 years
-4. Download/save files in PEM format:
-	 - `origin.crt`
-	 - `origin.key`
-
-### 2 Create Kubernetes TLS secret
-
-From the project root (or directory containing the certificate files):
+Create once per cluster/namespace if your ingress TLS uses Cloudflare Origin cert:
 
 ```bash
 kubectl create secret tls cloudflare-origin-cert \
-	--namespace entebus \
-	--cert=origin.crt \
-	--key=origin.key
+  --namespace entebus \
+  --cert=origin.crt \
+  --key=origin.key
 ```
 
-Verify secret:
+If the secret already exists and you need to rotate it:
 
 ```bash
-kubectl get secret cloudflare-origin-cert -n entebus
+kubectl delete secret cloudflare-origin-cert -n entebus
+kubectl create secret tls cloudflare-origin-cert \
+  --namespace entebus \
+  --cert=origin.crt \
+  --key=origin.key
 ```
 
-### 3 Ensure ingress points to secret
-
-The ingress already references:
-
-- Secret name: `cloudflare-origin-cert`
-- TLS host in base: `api.entebus.com`
-- TLS host in dev overlay: `dev-api.entebus.com` (patched)
-
-Confirm final ingress manifest:
+## Deploy Standard Dev (No Tunnel)
 
 ```bash
-kubectl get ingress entebus-ingress -n entebus -o yaml
-```
-
-## 🧪 Post-Deployment Verification
-
-### Cluster resources
-
-```bash
-kubectl get ns
+kubectl apply -k overlays/dev
 kubectl get all -n entebus
 kubectl get ingress -n entebus
-kubectl get service -A
 ```
 
-### Ingress/DNS checks
+## Deploy Dev With Cloudflare Tunnel
 
-- Confirm your domain points to the ingress external IP (or node IP in MicroK8s setup)
-- In Cloudflare SSL/TLS mode, use **Full (strict)** after origin cert is configured
-- Test endpoint over HTTPS
+Use this overlay when you want Cloudflare Tunnel instead of exposing ingress through a typical public load balancer path.
 
-### App checks
+### 1) Create a tunnel in Cloudflare
 
-- Access API docs at: `https://api.entebus.com/docs` or `https://dev-api.entebus.com/docs`
-- Confirm backend pod logs:
+From Cloudflare Zero Trust dashboard:
+
+1. Create or choose a tunnel for this environment.
+2. Configure public hostnames:
+   - dev-api.entebus.com
+   - dev-minio.entebus.com
+   - dev-openobserve.entebus.com
+3. Point each hostname to your in-cluster ingress endpoint according to your tunnel routing model.
+
+### 2) Add tunnel credentials into Kubernetes secret manifest
+
+Edit overlays/dev-cloudflared/cloudflared-credentials-secret.yaml and replace REPLACE_WITH_CREDENTIALS_JSON with the raw credentials JSON content.
+
+Security note: avoid committing real credentials to git. Prefer creating the secret out-of-band in real environments.
+
+Safer alternative command:
 
 ```bash
-kubectl logs -n entebus deploy/entebus-server --tail=200
+kubectl create secret generic cloudflared-credentials \
+  --namespace entebus \
+  --from-file=credentials.json=./cloudflared-credentials.json \
+  --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-## 🔁 Recommended Deployment Sequence
+If you use the command above, remove or ignore the placeholder secret manifest in overlays/dev-cloudflared to avoid accidental overwrite.
 
-Use this sequence for safer rollout:
+### 3) Apply the tunnel overlay
 
-1. Render manifests (`kubectl kustomize ...`) for both overlays
-2. Ensure ingress-nginx controller exists
-3. Ensure `cloudflare-origin-cert` TLS secret exists in `entebus`
-4. Apply overlay (`kubectl apply -k ...`)
-5. Verify pods, services, ingress, and logs
-6. Validate HTTPS from public domain
+```bash
+kubectl apply -k overlays/dev-cloudflared
+```
 
-## ⚠️ Production Notes
+### 4) Verify cloudflared and app paths
 
-- Do not keep default credentials from `base/config.yaml` for production
-- Replace `latest` image tags in `overlays/prod/kustomization.yaml` with immutable release tags before deployment
-- The shared stack now runs in-cluster with PVC-backed persistence, so ensure your StorageClass and volumes are production-grade
-- HPA requires metrics-server to be installed and healthy
-- Consider external secret management, sealed secrets, or a CSI secret driver for long-term operations
+```bash
+kubectl get deploy -n entebus
+kubectl get pods -n entebus -l app=cloudflared
+kubectl logs -n entebus deploy/cloudflared --tail=200
+kubectl get ingress -n entebus
+```
 
-## 🛠️ Useful Troubleshooting Commands
+### 5) Functional checks
+
+- https://dev-api.entebus.com/docs
+- https://dev-minio.entebus.com
+- https://dev-openobserve.entebus.com
+
+## Deploy Prod
+
+```bash
+kubectl apply -k overlays/prod
+kubectl get all -n entebus
+kubectl get ingress -n entebus
+```
+
+## Rollback
+
+Rollback to previous overlay state:
+
+```bash
+kubectl rollout undo deployment/entebus-server -n entebus
+kubectl rollout undo deployment/cloudflared -n entebus
+```
+
+Or redeploy desired overlay explicitly:
+
+```bash
+kubectl apply -k overlays/dev
+# or
+kubectl apply -k overlays/dev-cloudflared
+# or
+kubectl apply -k overlays/prod
+```
+
+## Troubleshooting
 
 ```bash
 kubectl describe ingress entebus-ingress -n entebus
 kubectl describe pod -n entebus -l app=entebus-server
+kubectl describe pod -n entebus -l app=cloudflared
 kubectl get events -n entebus --sort-by=.lastTimestamp
 kubectl logs -n ingress-nginx deploy/ingress-nginx-controller --tail=200
 ```
 
-If ingress returns 404/503:
+Common checks:
 
-- Check service name/port mapping (`entebus-server-svc:80`)
-- Confirm backend pod is Ready
-- Confirm ingress class is `nginx`
-- Confirm DNS points to ingress endpoint
+- Ingress class is nginx
+- TLS secret cloudflare-origin-cert exists in namespace entebus
+- cloudflared pod is Running and not restarting
+- Cloudflare tunnel hostname routes match the ingress hostnames
+- Backend services and pods are Ready
