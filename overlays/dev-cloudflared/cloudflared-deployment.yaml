@@ -20,28 +20,18 @@ spec:
         - name: cloudflared
           image: cloudflare/cloudflared:latest
           imagePullPolicy: IfNotPresent
+          env:
+            - name: CLOUDFLARE_TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflared-credentials-secret
+                  key: CLOUDFLARE_TUNNEL_TOKEN
           args:
             - tunnel
-            - run
-            - --credentials-file
-            - /etc/cloudflared/credentials.json
             - --no-autoupdate
-          volumeMounts:
-            - name: cloudflared-creds
-              mountPath: /etc/cloudflared
-              readOnly: true
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 128Mi
-      volumes:
-        - name: cloudflared-creds
-          secret:
-            secretName: cloudflared-credentials
-
+            - run
+            - --token
+            - $(CLOUDFLARE_TUNNEL_TOKEN)
 ---
 apiVersion: v1
 kind: ServiceAccount

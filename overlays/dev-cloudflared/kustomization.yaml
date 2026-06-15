@@ -4,4 +4,4 @@ kind: Kustomization
 resources:
   - ../dev
   - cloudflared-deployment.yaml
-  - cloudflared-credentials-secret.yaml
+  - cloudflared-secret.yaml
